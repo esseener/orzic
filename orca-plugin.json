@@ -1,0 +1,33 @@
+{
+  "manifestVersion": 2,
+  "id": "team-flow",
+  "name": "Team Flow",
+  "version": "0.1.0",
+  "description": "Save a coding team and follow its Orca tasks from the sidebar.",
+  "engines": {
+    "orca": ">=1.4.268"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "team-flow",
+        "title": "Team Flow",
+        "icon": "blocks",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "events": [{ "on": "agent.status.changed" }]
+  },
+  "capabilities": [
+    { "kind": "storage:own" },
+    { "kind": "workspace:read" },
+    { "kind": "agent:read" },
+    { "kind": "agent:launch" },
+    { "kind": "workspace:write" },
+    { "kind": "terminal:read" }
+  ]
+}
