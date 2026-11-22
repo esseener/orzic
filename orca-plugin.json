@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "orzic",
   "name": "Orzic",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Orzic — save a coding team and follow its Orca tasks from the sidebar.",
   "engines": {
     "orca": ">=1.4.268"
