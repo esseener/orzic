@@ -592,16 +592,12 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
         const run: Run = { schemaVersion: 2, id: randomUUID().slice(0, 12), goal: '自由协作会话',
           instructions: instructions?.trim() ?? '', team, path, workspace, status: 'starting', startedAt: Date.now(),
           workflow: { phase: 'executing', policy } }
-        // Create the native run up front so member dispatches map onto the panel cards.
-        const created = await command<{ runId?: string }>('orchestration', 'run-create', '--objective', objective(run))
-        if (!nonempty(created?.runId)) throw new Error('Orca 未返回原生 Run ID，未启动。')
-        run.nativeId = created.runId
         const args = launchArgs(run, fusionPrompt(run))
         await orca.storage.set('team', team)
         await orca.storage.set(`run:${workspace}`, run)
         launches.set(workspace, run.id)
         handedOff = true
-        void launch(workspace, run.id, args).catch((error) => orca.log(describe(error)))
+        void launch(workspace, run.id, args, { bindRun: true }).catch((error) => orca.log(describe(error)))
         orca.panels.post('flow.changed', { workspace })
         return run
       })
@@ -610,7 +606,7 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
     }
   })
 
-  async function launch(workspace: string, runId: string, args: string[]): Promise<void> {
+  async function launch(workspace: string, runId: string, args: string[], options?: { bindRun?: boolean }): Promise<void> {
     let result: LaunchResult | undefined
     let failure: string | undefined
     try {
@@ -624,14 +620,26 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
     const leadTerminal = result?.outcome?.kind === 'terminal' && handle?.startsWith('term_') ? handle : undefined
     const delivery = nonempty(result?.prompt?.outcome)
     const operationId = nonempty(result?.operationId) ?? nonempty(result?.receipt?.operationId)
-    const issue = failure ?? (!leadTerminal ? 'Orca 没有确认主脑终端，请检查是否已启动。' :
+    let issue = failure ?? (!leadTerminal ? 'Orca 没有确认主脑终端，请检查是否已启动。' :
       delivery !== 'journaled' && delivery !== 'handed-to-terminal' ? '主脑终端已启动，但 Orca 尚未确认需求已送达。请打开会话检查。' : undefined)
+    // Fusion: bind a fresh native Run to the lead terminal so member dispatches map onto the cards.
+    let nativeId: string | undefined
+    if (options?.bindRun && leadTerminal) {
+      try {
+        const created = await command<{ runId?: string }>('orchestration', 'run-create',
+          '--objective', objective({ id: runId } as Run), '--from', leadTerminal)
+        if (!nonempty(created?.runId)) issue ??= '主脑已启动，但 Orca 未返回原生 Run ID，成员任务不会显示在卡片上。'
+        else nativeId = created.runId
+      } catch (error) {
+        issue ??= `主脑已启动，但创建原生 Run 失败：${describe(error)}。成员任务不会显示在卡片上。`
+      }
+    }
     try {
       await inWorkspace(workspace, async () => {
         const current = await storedRun(workspace)
         if (current?.id !== runId) return
         await orca.storage.set(`run:${workspace}`, { ...current, status: issue ? 'attention' : 'active',
-          ...(leadTerminal ? { leadTerminal } : {}), ...(delivery ? { delivery } : {}),
+          ...(leadTerminal ? { leadTerminal } : {}), ...(nativeId ? { nativeId } : {}), ...(delivery ? { delivery } : {}),
           ...(operationId ? { operationId } : {}), ...(issue ? { issue } : {}) })
       })
     } finally {

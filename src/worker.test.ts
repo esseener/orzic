@@ -644,21 +644,23 @@ test('a damaged configuration stays stored until explicit save and CLI inventori
   }
 })
 
-test('fusion launches one persistent router session on a fresh native run', async () => {
+test('fusion launches a persistent router and binds a fresh native run to its terminal', async () => {
   const { worker, calls, launches } = await setup((args) =>
     args.slice(0, 2).join(' ') === 'orchestration run-create' ? { runId: 'run_fusion' } : undefined)
   try {
     const run = await worker.request('flow.fusion', { workspace, instructions: '保留用户改动。', team, policy: defaultPolicy })
-    equal(run.nativeId, 'run_fusion')
     equal(run.workflow?.phase, 'executing')
     const launch = launches().at(-1)
     ok(launch, 'expected one agent launch')
     const prompt = launch[launch.indexOf('--prompt') + 1]
     match(prompt, /常驻的路由会话/)
-    match(prompt, /run_fusion/)
     match(prompt, /\[TF:app\]/)
-    // The objective also drives run-create so member cards map onto this run.
-    ok(calls.some((args) => args.slice(0, 2).join(' ') === 'orchestration run-create' && args.includes(`[Orzic ${run.id}]`)))
+    match(prompt, /run-current/)
+    // run-create binds to the launched lead terminal, so member dispatches map onto the cards.
+    const bind = calls.find((args) => args.slice(0, 2).join(' ') === 'orchestration run-create')
+    ok(bind && bind.includes('--from') && bind.includes('term_lead'), 'expected run-create --from term_lead')
+    ok(bind!.includes(`[Orzic ${run.id}]`))
+    await worker.request('flow.snapshot', {})
   } finally { await worker.deactivate() }
 })
 

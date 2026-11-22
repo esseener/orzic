@@ -30,7 +30,7 @@ export function fusionPrompt(run: Run): string {
   const policy = run.workflow?.policy
   return `你是 Orzic 的主脑，一个常驻的路由会话。用中文沟通。用户在这个终端里随时发消息，每条消息都当新需求处理，自己判断要不要派活、派给谁。
 先运行 orca skills get orchestration，遵循当前 Orca 的原生编排流程。所有本机编排命令都使用 --environment local 和 --json。
-已为你创建并绑定原生 Run：${JSON.stringify(run.nativeId)}（objective ${objective(run)}）。全部任务都建在这个 Run 里；会话中断重开时用 run-use 找回它，不要新建另一个。
+已为你创建并绑定原生 Run（objective ${objective(run)}；你的终端是它的 coordinator）。用 orca orchestration run-current 确认其 ID；全部任务都建在这个 Run 里，不要新建另一个。
 当前项目绝对路径：${JSON.stringify(run.path ?? '使用启动会话所在的当前工作区，不切换到其他项目')}
 
 每条消息的处置：
@@ -54,7 +54,7 @@ ${run.instructions?.trim() || '用户未单独填写。'}
 ${JSON.stringify(rosterFor(run), null, 2)}
 \`\`\`
 
-派发方式：orca orchestration task-create --run ${JSON.stringify(run.nativeId)} --task-title "<成员标识> <简短中文任务>" [--deps <前置Task ID>]，再 worker-start --run ${JSON.stringify(run.nativeId)} --task <ID> --worktree current <该成员 startupArgs> --keep-open。记录真实 Task/Dispatch ID，派发回执不明先查证不重发。
+派发方式：orca orchestration task-create --run <run-current 返回的 Run ID> --task-title "<成员标识> <简短中文任务>" [--deps <前置Task ID>]，再 worker-start --run <同一 Run ID> --task <ID> --worktree current <该成员 startupArgs> --keep-open。记录真实 Task/Dispatch ID，派发回执不明先查证不重发。
 派发后结束当前回合等 Orca 唤醒，不要轮询收件箱。任务收尾时在终端向用户简短汇总：实际改了什么、验证结果、审核发现、遗留问题。`
 }
 
