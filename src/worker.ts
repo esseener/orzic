@@ -5,8 +5,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, isAbsolute, join } from 'node:path'
 import type { OrcaWorkerApi } from 'orca/worker'
+import { fusionPrompt, leadPrompt, objective, projectSteps, taskPrefix, type NativeTask, type NativeWorker } from './flow'
 import { maxTaskLength, migrateTeam, supportsModel, validateEffortCatalog, validateTeam, type ModelCatalog, type Run, type Snapshot, type State, type Step, type Workflow } from './protocol'
-import { leadPrompt, objective, projectSteps, taskPrefix, type NativeTask, type NativeWorker } from './flow'
 import { readModelCatalog } from './model-catalog'
 import { validatePlan, validatePolicy } from './workflow'
 
@@ -95,8 +95,8 @@ function describe(error: unknown): string {
   return code ? `${message}（${code}）` : message
 }
 
-function launchArgs(run: Run): string[] {
-  const args = ['agent', 'launch', '--worktree', `id:${run.workspace}`, '--agent', run.team.lead, '--surface', 'terminal', '--prompt', leadPrompt(run)]
+function launchArgs(run: Run, prompt?: string): string[] {
+  const args = ['agent', 'launch', '--worktree', `id:${run.workspace}`, '--agent', run.team.lead, '--surface', 'terminal', '--prompt', prompt ?? leadPrompt(run)]
   if (run.team.leadModel) args.push('--model', run.team.leadModel)
   if (run.team.leadEffort) args.push('--effort', run.team.leadEffort)
   if (args.some((arg) => arg.includes('\0'))) throw new Error('启动内容不能含有空字符。')
@@ -548,6 +548,55 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
           instructions: instructions.trim(), team, path, workspace, status: 'starting', startedAt: Date.now(),
           workflow: { phase: 'planning', policy } }
         const args = launchArgs(run)
+        await orca.storage.set('team', team)
+        await orca.storage.set(`run:${workspace}`, run)
+        launches.set(workspace, run.id)
+        handedOff = true
+        void launch(workspace, run.id, args).catch((error) => orca.log(describe(error)))
+        orca.panels.post('flow.changed', { workspace })
+        return run
+      })
+    } finally {
+      if (!handedOff) launches.delete(workspace)
+    }
+  })
+
+  // Long-lived routing session: every user message is a new demand the lead routes itself.
+  orca.panels.handle('flow.fusion', async ({ workspace, instructions, team: input, policy: inputPolicy }, { signal }) => {
+    if ((instructions !== undefined && typeof instructions !== 'string') || (typeof instructions === 'string' && instructions.length > maxTaskLength)) throw new Error(`工作区长期指导必须是文本，且不能超过 ${maxTaskLength} 字。`)
+    const policy = validatePolicy(inputPolicy)
+    if (!workspace || launches.has(workspace)) throw new Error('该工作区正在启动。')
+    launches.set(workspace, null)
+    let handedOff = false
+    try {
+      const [active, agents] = await Promise.all([activeWorkspace(), installed(true)])
+      if (active.workspace !== workspace || !active.local || !active.path) throw new Error('请选择当前本机工作区，再启动自由协作。')
+      const path = active.path
+      const team = validateTeam(input, agents)
+      return await inWorkspace(workspace, async () => {
+        const previous = await storedRun(workspace)
+        // Reuse a live lead terminal instead of opening a second router session.
+        if (previous?.status !== 'completed' && previous?.status !== 'failed' && previous?.leadTerminal) {
+          const state = await leadState(previous, previous.leadTerminal).catch(() => 'unknown' as State)
+          if (state !== 'unknown') {
+            await command('terminal', 'switch', '--terminal', previous.leadTerminal).catch(() => undefined)
+            return previous
+          }
+        }
+        if (previous && previous.status !== 'completed' && previous.status !== 'failed' && previous.status !== 'unknown') {
+          throw new Error('上一会话尚未结束，请先查看主脑终端或结束本次运行。')
+        }
+        const latest = await activeWorkspace()
+        if (latest.workspace !== workspace || !latest.local || latest.path !== path) throw new Error('工作区已切换，请重新确认后启动。')
+        signal.throwIfAborted()
+        const run: Run = { schemaVersion: 2, id: randomUUID().slice(0, 12), goal: '自由协作会话',
+          instructions: instructions?.trim() ?? '', team, path, workspace, status: 'starting', startedAt: Date.now(),
+          workflow: { phase: 'executing', policy } }
+        // Create the native run up front so member dispatches map onto the panel cards.
+        const created = await command<{ runId?: string }>('orchestration', 'run-create', '--objective', objective(run))
+        if (!nonempty(created?.runId)) throw new Error('Orca 未返回原生 Run ID，未启动。')
+        run.nativeId = created.runId
+        const args = launchArgs(run, fusionPrompt(run))
         await orca.storage.set('team', team)
         await orca.storage.set(`run:${workspace}`, run)
         launches.set(workspace, run.id)

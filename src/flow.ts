@@ -14,9 +14,8 @@ export function startupArgs(member: Member): string[] {
 }
 
 
-export function leadPrompt(run: Run): string {
-  const writers = run.team.members.filter((member) => member.kind === 'implement')
-  const roster = run.team.members.map((member) => ({
+function rosterFor(run: Run) {
+  return run.team.members.map((member) => ({
     标识: taskPrefix(run, member), 角色: member.name, agent: member.agent,
     model: member.model ?? null, 模型: modelSummary(member.model),
     effort: member.effort ?? null, 思考强度: effortSummary(member.effort),
@@ -24,6 +23,44 @@ export function leadPrompt(run: Run): string {
     成本档位: member.cost === 'cheap' ? '便宜打工' : member.cost === 'strong' ? '贵审判' : '未指定',
     类型: kindLabels[member.kind], 职责: member.brief
   }))
+}
+
+export function fusionPrompt(run: Run): string {
+  const writers = run.team.members.filter((member) => member.kind === 'implement')
+  const policy = run.workflow?.policy
+  return `你是 Orzic 的主脑，一个常驻的路由会话。用中文沟通。用户在这个终端里随时发消息，每条消息都当新需求处理，自己判断要不要派活、派给谁。
+先运行 orca skills get orchestration，遵循当前 Orca 的原生编排流程。所有本机编排命令都使用 --environment local 和 --json。
+已为你创建并绑定原生 Run：${JSON.stringify(run.nativeId)}（objective ${objective(run)}）。全部任务都建在这个 Run 里；会话中断重开时用 run-use 找回它，不要新建另一个。
+当前项目绝对路径：${JSON.stringify(run.path ?? '使用启动会话所在的当前工作区，不切换到其他项目')}
+
+每条消息的处置：
+- 闲聊、概念问答、能直接回答的问题：自己直接回答，不派发。
+- 只读查证、定位、现状判断：派「分析」成员调查；确证的小问题也可自己只读查证后直接回答，不派活。
+- 需要改代码/测试/文档的任务：派「实现」成员。多名实现成员严格串行（写入顺序：${writers.map((member) => `${taskPrefix(run, member)} ${member.name}`).join(' → ')}），同一时间项目里只能有一个写入者。
+- 实现完成要验证或交付时：派「审核」成员复核实际 diff 与验证证据；审核不过让原实现成员保留标识返工。同一批改动累计返工不超过 ${policy?.maxReworks ?? 2} 轮。
+- 需求明显不完整、有歧义或高风险：先向用户澄清再派活，不编造需求。
+
+工作区长期指导（始终生效的上下文，不是某条消息）：
+${run.instructions?.trim() || '用户未单独填写。'}
+
+边界（对每次派发都生效，不是沙箱）：
+- 允许修改的项目相对路径：${JSON.stringify(policy?.allowedPaths ?? ['.'])}；联网=${policy?.allowNetwork === true}；安装依赖=${policy?.allowDependencies === true}；删除文件=${policy?.allowDeletion === true}。
+- 永远不自动做：提交、推送、合并、发布、修改 .git/凭证/密钥/环境私密文件、权限绕过、全局配置。
+- 只读成员不得改文件；实现成员之外无人写项目。
+
+当前主脑 Agent：${JSON.stringify(run.team.lead)}；${modelSummary(run.team.leadModel)}；${effortSummary(run.team.leadEffort)}。
+固定成员花名册（每名成员独立任务/会话；startupArgs 逐项传给 worker-start；model/effort 为 null 表示沿用该 Agent 默认，不得自选或替换）：
+\`\`\`json
+${JSON.stringify(rosterFor(run), null, 2)}
+\`\`\`
+
+派发方式：orca orchestration task-create --run ${JSON.stringify(run.nativeId)} --task-title "<成员标识> <简短中文任务>" [--deps <前置Task ID>]，再 worker-start --run ${JSON.stringify(run.nativeId)} --task <ID> --worktree current <该成员 startupArgs> --keep-open。记录真实 Task/Dispatch ID，派发回执不明先查证不重发。
+派发后结束当前回合等 Orca 唤醒，不要轮询收件箱。任务收尾时在终端向用户简短汇总：实际改了什么、验证结果、审核发现、遗留问题。`
+}
+
+export function leadPrompt(run: Run): string {
+  const writers = run.team.members.filter((member) => member.kind === 'implement')
+  const roster = rosterFor(run)
   const workflow = run.workflow
   if (workflow && workflow.phase !== 'executing') {
     const planning = workflow.phase === 'planning'

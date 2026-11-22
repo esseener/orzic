@@ -162,6 +162,7 @@ declare module 'orca' {
     'flow.save': { input: Team; output: Team }
     'flow.models': { input: { workspace: string | null; agent: string; refresh?: boolean }; output: ModelCatalog }
     'flow.start': { input: { workspace: string; goal: string; acceptance: string; instructions: string; team: Team; policy?: ExecutionPolicy }; output: Run }
+    'flow.fusion': { input: { workspace: string; instructions?: string; team: Team; policy?: ExecutionPolicy }; output: Run }
     'flow.propose': { input: { workspace: string; runId: string; baseRevision: number; plan: Omit<Plan, 'revision'> }; output: Run }
     'flow.approve': { input: { workspace: string; runId: string; revision: number }; output: Run }
     'flow.revise': { input: { workspace: string; runId: string; revision: number; feedback: string; policy?: ExecutionPolicy }; output: Run }

@@ -374,6 +374,41 @@ async function start() {
   } finally { if (!sync.signal.aborted) set(busy, false) }
 }
 
+async function fusion() {
+  const state = read(data)
+  const sync = read(controller)
+  if (!state?.workspace || !sync) return
+  const result = checkTeam(state.team, state.agents)
+  if (startBlocker(state, result.error) || !result.team) return
+  const scope = sync.scope()
+  const workspace = state.workspace
+  set(busy, true)
+  set(actionError, '')
+  set(notice, '')
+  try {
+    const run = await plugin.request('flow.fusion', {
+      workspace, team: result.team, instructions: read(instructions).trim(), policy: validatePolicy(read(policyDraft))
+    }, { signal: sync.signal, timeoutMs: 30_000 })
+    if (sync.signal.aborted) return
+    const latest = read(data)
+    if (latest && sync.scope() === scope) {
+      if (latest.run?.id !== run.id) {
+        resetDetail()
+        set(data, { ...latest, run, steps: [], canStart: false })
+      }
+      set(notice, '主脑路由会话已启动，请直接在该终端里发消息；每条消息会按队伍自动判断派发。')
+    }
+    sync.refresh(true)
+  } catch (error) {
+    if (!sync.signal.aborted && sync.scope() === scope) {
+      set(actionError, message(error))
+      const latest = read(data)
+      if (latest?.canStart) set(data, { ...latest, canStart: false })
+    }
+    sync.refresh(true)
+  } finally { if (!sync.signal.aborted) set(busy, false) }
+}
+
 async function inspect(memberId: string) {
   const state = read(data)
   const sync = read(controller)
@@ -796,7 +831,11 @@ export default function Panel() {
             set(acceptance, '')
           }}>清空本次任务</Button>
           {disabledReason && disabledReason !== projectIssue && <Text size="xs" muted>{disabledReason}</Text>}
-          <Button tone="accent" icon="play" disabled={!!disabledReason} onPress={() => { if (canEditTask()) return start() }}>启动队伍</Button>
+          <Row gap="xs" wrap>
+            <Button tone="accent" icon="play" disabled={!!disabledReason} onPress={() => { if (canEditTask()) return start() }}>启动队伍</Button>
+            <Button variant="ghost" icon="bot" disabled={!!disabledReason} onPress={() => { if (canEditTask()) return fusion() }}>自由协作</Button>
+          </Row>
+          <Text size="xs" muted>「自由协作」起主脑常驻路由会话：你在它的终端里随时发消息，每条由主脑自行判断派给谁；执行边界同上。</Text>
         </Stack>
       </Card>
       {run && <Stack gap="xs">

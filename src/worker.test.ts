@@ -643,3 +643,34 @@ test('a damaged configuration stays stored until explicit save and CLI inventori
     await second.worker.deactivate()
   }
 })
+
+test('fusion launches one persistent router session on a fresh native run', async () => {
+  const { worker, calls, launches } = await setup((args) =>
+    args.slice(0, 2).join(' ') === 'orchestration run-create' ? { runId: 'run_fusion' } : undefined)
+  try {
+    const run = await worker.request('flow.fusion', { workspace, instructions: '保留用户改动。', team, policy: defaultPolicy })
+    equal(run.nativeId, 'run_fusion')
+    equal(run.workflow?.phase, 'executing')
+    const launch = launches().at(-1)
+    ok(launch, 'expected one agent launch')
+    const prompt = launch[launch.indexOf('--prompt') + 1]
+    match(prompt, /常驻的路由会话/)
+    match(prompt, /run_fusion/)
+    match(prompt, /\[TF:app\]/)
+    // The objective also drives run-create so member cards map onto this run.
+    ok(calls.some((args) => args.slice(0, 2).join(' ') === 'orchestration run-create' && args.includes(`[Orzic ${run.id}]`)))
+  } finally { await worker.deactivate() }
+})
+
+test('fusion reuses a live lead terminal instead of opening a second session', async () => {
+  const live: Run = { schemaVersion: 2, id: 'live1', team, status: 'active', goal: '会话',
+    path, workspace, nativeId: 'run_live', leadTerminal: 'term_lead', workflow: { phase: 'executing', policy: defaultPolicy } }
+  const { worker, calls, launches } = await setup(undefined, { [runKey]: live } as unknown as Record<string, JsonValue>)
+  try {
+    const run = await worker.request('flow.fusion', { workspace, team })
+    equal(run.id, 'live1')
+    equal(launches().length, 0)
+    ok(calls.some((args) => args.join(' ') === 'terminal switch --terminal term_lead'))
+    ok(!calls.some((args) => args.slice(0, 2).join(' ') === 'orchestration run-create'))
+  } finally { await worker.deactivate() }
+})
