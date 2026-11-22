@@ -1,9 +1,9 @@
 {
   "manifestVersion": 2,
-  "id": "team-flow",
-  "name": "Team Flow",
+  "id": "orzic",
+  "name": "Orzic",
   "version": "0.1.0",
-  "description": "Save a coding team and follow its Orca tasks from the sidebar.",
+  "description": "Orzic — save a coding team and follow its Orca tasks from the sidebar.",
   "engines": {
     "orca": ">=1.4.268"
   },
@@ -14,7 +14,7 @@
     "panels": [
       {
         "id": "team-flow",
-        "title": "Team Flow",
+        "title": "Orzic",
         "icon": "blocks",
         "entry": "src/panel.tsx",
         "ui": "components"

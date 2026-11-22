@@ -376,7 +376,7 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
   function panelAction(panel: { surface: string; contributionId: string }): void {
     // Keep decisions on this panel's route, not an editor's. This is not human authentication:
     // Orca's dev bridge may supply the same panel identity, including for CLI calls.
-    if (panel.surface !== 'panel' || panel.contributionId !== 'team-flow') throw new Error('请在 Team Flow 侧栏确认或修改计划。')
+    if (panel.surface !== 'panel' || panel.contributionId !== 'team-flow') throw new Error('请在 Orzic 侧栏确认或修改计划。')
   }
 
   function feedbackText(value: unknown): string {
@@ -418,7 +418,7 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
       if (!from) {
         // orchestration send needs a sender handle; reuse one worker-owned terminal per workspace.
         const made = await command<{ terminal?: { handle?: string } }>('terminal', 'create',
-          '--worktree', `id:${pending.workspace}`, '--title', 'Team Flow 授权').catch(() => undefined)
+          '--worktree', `id:${pending.workspace}`, '--title', 'Orzic 授权').catch(() => undefined)
         const handle = nonempty(made?.terminal?.handle)
         if (handle?.startsWith('term_')) { senders.set(pending.workspace, handle); from = handle }
       }
@@ -468,7 +468,7 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
     })
     if (!prepared.pending) return prepared.run
     const executing = { ...prepared.pending, workflow: { ...prepared.pending.workflow, phase: 'executing' as const } }
-    return sendInstruction(prepared.run, prepared.pending, `Team Flow：批准计划 v${revision}`, leadPrompt(executing))
+    return sendInstruction(prepared.run, prepared.pending, `Orzic：批准计划 v${revision}`, leadPrompt(executing))
   })
 
   orca.panels.handle('flow.revise', async ({ workspace, runId, revision, feedback: input, policy }, { panel, signal }) => {
@@ -486,7 +486,7 @@ export default function activate(orca: OrcaWorkerApi, command: Cli = cli,
       mailings.add(workspace)
       return { run, pending }
     })
-    return sendInstruction(prepared.run, prepared.pending, `Team Flow：修改计划 v${revision}`, leadPrompt(prepared.pending))
+    return sendInstruction(prepared.run, prepared.pending, `Orzic：修改计划 v${revision}`, leadPrompt(prepared.pending))
   })
 
   orca.panels.handle('flow.block', ({ workspace, runId, reason }, { signal }) => inWorkspace(workspace, async () => {

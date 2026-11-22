@@ -1,6 +1,6 @@
 import { effortSummary, kindLabels, modelSummary, type Member, type Run, type State, type Step } from './protocol'
 
-export function objective(run: Run): string { return `[Team Flow ${run.id}]` }
+export function objective(run: Run): string { return `[Orzic ${run.id}]` }
 
 const legacyPrefixes: Record<string, string | undefined> = { implement: 'Implement:', diagnose: 'Diagnose:', review: 'Review:' }
 
@@ -27,7 +27,7 @@ export function leadPrompt(run: Run): string {
   const workflow = run.workflow
   if (workflow && workflow.phase !== 'executing') {
     const planning = workflow.phase === 'planning'
-    return `你是 Team Flow 的主脑。用中文沟通。${planning ? '当前只允许只读了解项目并提出计划，尚未获得执行授权。' : '当前计划尚未进入可执行状态；停下等待用户处理，不创建或派发任何任务。'}
+    return `你是 Orzic 的主脑。用中文沟通。${planning ? '当前只允许只读了解项目并提出计划，尚未获得执行授权。' : '当前计划尚未进入可执行状态；停下等待用户处理，不创建或派发任何任务。'}
 先运行 orca skills get orchestration，遵循当前 Orca 的原生编排流程。本机命令使用 --environment local 和 --json。
 当前项目绝对路径：${JSON.stringify(run.path ?? '使用启动会话所在的当前工作区，不切换到其他项目')}
 规划身份标识：${objective(run)}。这里只是本次任务标识，规划阶段不得创建或派发原生执行 Run。
@@ -70,7 +70,7 @@ ${JSON.stringify({ plan: workflow.plan, policy: workflow.policy }, null, 2)}
 遇到超范围、高风险、关键歧义、持续失败、权限阻塞或送达不明确，先停止相关工作，使用 orca plugin dev request local.team-flow flow.block --data <完整JSON> --environment local --json 记录明确原因。完整 JSON 使用 workspace=${JSON.stringify(run.workspace)}、runId=${JSON.stringify(run.id)}、reason: string（明确原因及真实 Task/Dispatch/请求 ID）；用原生参数数组或可靠 JSON 传参，不能执行占位示例。保留已有真实 ID，等待用户处理，不反复新启、不调用 flow.approve，也不修改插件存储绕过。
 原生派发失败、模型/强度被拒绝也按此阻塞处理，不能替换 Agent、模型或强度。完成必须以实际验证加审核为准，配置、发送或启动回执不能冒充执行完成。这些是正常工作流和协作约束，不是通用技术沙箱。
 ` : ''
-  return `你是 Team Flow 的主脑。用中文沟通。你负责理解当前项目、拆分、派发、处理阻塞和最终汇总，不亲自修改项目。
+  return `你是 Orzic 的主脑。用中文沟通。你负责理解当前项目、拆分、派发、处理阻塞和最终汇总，不亲自修改项目。
 先运行 orca skills get orchestration，遵循当前 Orca 的原生编排流程。所有本机编排命令都使用 --environment local 和 --json；创建 Run 后，任务、派发和读取命令显式指定本次 --run。
 
 当前项目绝对路径：${JSON.stringify(run.path ?? '使用启动会话所在的当前工作区，不切换到其他项目')}

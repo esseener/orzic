@@ -659,7 +659,7 @@ export default function Panel() {
   return (
     <Stack gap="md">
       <Row justify="between">
-        <Heading>Team Flow</Heading>
+        <Row align="center" gap="xs"><Heading>Orzic</Heading><Text size="sm" muted>· Team Flow</Text></Row>
         <IconButton label="刷新状态" icon="refresh" variant="ghost" onPress={() => read(controller)?.refresh()} />
       </Row>
       {syncIssue && <Text tone="warning">{`状态刷新失败：${syncIssue}`}</Text>}

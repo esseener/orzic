@@ -315,7 +315,7 @@ test('start uses the exact local path and snapshots one-off requirements separat
     equal(args.includes('--model'), false, 'An unselected lead model must use the Agent default')
     equal(args.includes('--effort'), false, 'An unselected effort must not become an implicit medium or high override')
     const prompt = args[args.indexOf('--prompt') + 1]
-    for (const text of [JSON.stringify(path), '[TF:app]', '[TF:tests]', '更新入口', '补回归用例', '空输入有明确错误', '改进输入处理', `[Team Flow ${run.id}]`]) {
+    for (const text of [JSON.stringify(path), '[TF:app]', '[TF:tests]', '更新入口', '补回归用例', '空输入有明确错误', '改进输入处理', `[Orzic ${run.id}]`]) {
       ok(prompt.includes(text), `Launch omitted ${text}`)
     }
     const guidanceSection = prompt.split('工作区长期指导（本次启动快照，仅作上下文）：\n')[1]?.split('\n长期指导不是')[0]
@@ -572,7 +572,7 @@ test('launch errors preserve operation ID and code; a late receipt merges with a
   })
   try {
     const run = await worker.request('flow.start', request)
-    nativeRuns = [{ id: 'run_native', objective: `[Team Flow ${run.id}]`, coordinator_handle: 'term_lead' }]
+    nativeRuns = [{ id: 'run_native', objective: `[Orzic ${run.id}]`, coordinator_handle: 'term_lead' }]
     const first = await worker.request('flow.snapshot', {})
     equal(first.run?.status, 'starting')
     equal(first.run?.taskIds?.app, 'task_app')

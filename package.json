@@ -1,5 +1,5 @@
 {
-  "name": "orca-team-flow",
+  "name": "orzic",
   "version": "0.1.0",
   "private": true,
   "scripts": { "typecheck": "tsc -p ." },
